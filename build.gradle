@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.sonatype.gradle.plugins.scan' version '3.1.5'
+    id 'org.sonatype.gradle.plugins.scan' version '3.1.6-SNAPSHOT'
 }
 
 java {
@@ -22,19 +22,40 @@ tasks.register('demonstrateBug') {
         println "=== scan-gradle-plugin ASM Reproducer ==="
         println "Class file   : ${classFile.name}"
         println "Major version: ${majorVersion} (61 = Java 17)"
-        println "ClassReader  : ${groovyjarjarasm.asm.ClassReader.class.protectionDomain?.codeSource?.location}"
-        println ""
 
-        classFile.withInputStream { stream ->
-            try {
-                new groovyjarjarasm.asm.ClassReader(stream)
-                println "RESULT: ClassReader succeeded — bug not present in this version"
-            } catch (IllegalArgumentException e) {
-                println "RESULT: FAILED — ${e.message}"
-                println ""
-                println "BUG CONFIRMED: scan-gradle-plugin bundles an outdated groovyjarjarasm.asm.ClassReader"
-                println "that does not support Java 17+ class files (major version >= 61)."
-                println "Its copy shadows Groovy's own ClassReader, which supports Java 17+."
+        // Use reflection so this compiles against any version of the plugin (fixed or unfixed)
+        Class classReaderClass
+        try {
+            classReaderClass = Class.forName('groovyjarjarasm.asm.ClassReader')
+        } catch (ClassNotFoundException ignored) {
+            classReaderClass = null
+        }
+
+        if (classReaderClass == null) {
+            println "ClassReader  : not bundled by scan-gradle-plugin (fix applied)"
+            println ""
+            println "RESULT: FIX CONFIRMED — groovyjarjarasm.asm.ClassReader is no longer bundled"
+            println "in the scan-gradle-plugin jar. Groovy's own compatible ClassReader will be"
+            println "used by any consumer Gradle plugin (e.g. FindMainClassTask) at runtime."
+        } else {
+            println "ClassReader  : ${classReaderClass.protectionDomain?.codeSource?.location}"
+            println ""
+            classFile.withInputStream { stream ->
+                try {
+                    classReaderClass.getDeclaredConstructor(InputStream).newInstance(stream)
+                    println "RESULT: ClassReader succeeded — bug not present in this version"
+                } catch (java.lang.reflect.InvocationTargetException e) {
+                    Throwable cause = e.cause
+                    if (cause instanceof IllegalArgumentException) {
+                        println "RESULT: FAILED — ${cause.message}"
+                        println ""
+                        println "BUG CONFIRMED: scan-gradle-plugin bundles an outdated groovyjarjarasm.asm.ClassReader"
+                        println "that does not support Java 17+ class files (major version >= 61)."
+                        println "Its copy shadows Groovy's own ClassReader, which supports Java 17+."
+                    } else {
+                        throw e
+                    }
+                }
             }
         }
         println ""
