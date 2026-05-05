@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.sonatype.gradle.plugins.scan' version '3.1.5'
+    id 'org.sonatype.gradle.plugins.scan' version '3.1.6-SNAPSHOT'
 }
 
 java {
@@ -10,6 +10,18 @@ java {
 
 repositories {
     mavenCentral()
+}
+
+dependencies {
+    // log4j-core 2.14.1 is vulnerable to Log4Shell (CVE-2021-44228)
+    implementation 'org.apache.logging.log4j:log4j-core:2.14.1'
+}
+
+ossIndexAudit {
+    username = System.getenv('SONATYPE_GUIDE_USERNAME') ?: ''
+    password = System.getenv('SONATYPE_GUIDE_TOKEN') ?: ''
+    failOnDetection = false
+    showAll = true
 }
 
 tasks.register('demonstrateBug') {
