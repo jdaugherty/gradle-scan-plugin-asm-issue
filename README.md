@@ -22,12 +22,11 @@ java.lang.IllegalArgumentException: Unsupported class file major version 61
 ## Prerequisites
 
 - JDK 17+
-- Gradle 8.x
 
 ## Reproduce
 
 ```bash
-gradle demonstrateBug
+./gradlew demonstrateBug
 ```
 
 Expected output:
