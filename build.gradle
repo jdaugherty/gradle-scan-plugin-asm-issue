@@ -1,0 +1,42 @@
+plugins {
+    id 'java'
+    id 'org.sonatype.gradle.plugins.scan' version '3.1.5'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+
+tasks.register('demonstrateBug') {
+    dependsOn compileJava
+    doLast {
+        File classFile = fileTree(layout.buildDirectory.dir('classes/java/main')).files.find { it.name.endsWith('.class') }
+        int majorVersion = classFile.bytes[7] & 0xFF
+
+        println ""
+        println "=== scan-gradle-plugin ASM Reproducer ==="
+        println "Class file   : ${classFile.name}"
+        println "Major version: ${majorVersion} (61 = Java 17)"
+        println "ClassReader  : ${groovyjarjarasm.asm.ClassReader.class.protectionDomain?.codeSource?.location}"
+        println ""
+
+        classFile.withInputStream { stream ->
+            try {
+                new groovyjarjarasm.asm.ClassReader(stream)
+                println "RESULT: ClassReader succeeded — bug not present in this version"
+            } catch (IllegalArgumentException e) {
+                println "RESULT: FAILED — ${e.message}"
+                println ""
+                println "BUG CONFIRMED: scan-gradle-plugin bundles an outdated groovyjarjarasm.asm.ClassReader"
+                println "that does not support Java 17+ class files (major version >= 61)."
+                println "Its copy shadows Groovy's own ClassReader, which supports Java 17+."
+            }
+        }
+        println ""
+    }
+}
